@@ -1,0 +1,7 @@
+node_modules/
+package-lock.json
+reports/
+test-results/
+.features-gen/
+.agent-runs/
+.claude/
