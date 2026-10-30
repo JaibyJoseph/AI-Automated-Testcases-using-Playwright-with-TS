@@ -1,10 +1,18 @@
 import { defineConfig, devices } from '@playwright/test';
+import { defineBddConfig } from 'playwright-bdd';
 import { env } from './src/config/env';
 
 const isCI = !!process.env.CI;
 
+// bddgen turns each .feature file into a Playwright spec in .features-gen/ (gitignored).
+const testDir = defineBddConfig({
+  features: 'features/**/*.feature',
+  steps: ['src/steps/**/*.ts', 'src/fixtures/**/*.ts'],
+  missingSteps: 'fail-on-gen',
+});
+
 export default defineConfig({
-  testDir: './tests',
+  testDir,
   outputDir: './test-results',
   fullyParallel: true,
   // A stray test.only must never silently shrink the CI suite.
