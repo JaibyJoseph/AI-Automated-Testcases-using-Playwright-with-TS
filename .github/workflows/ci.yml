@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The target is a shared public demo: never run two pipelines against it at once.
+concurrency:
+  group: ui-tests-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_COLOR: '0'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies exactly as locked
+        run: npm ci
+
+      - name: Verify dependency tree is complete and consistent
+        run: npm ls --all > /dev/null
+
+      - name: Check for high or critical vulnerabilities
+        run: npm audit --audit-level=high
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Verify tool versions
+        run: |
+          node --version
+          npm --version
+          npx playwright --version
+          npx tsc --version
+          npx eslint --version
+
+      - name: Format, lint and type check
+        run: npm run validate
+
+      - name: Generate specs from feature files (fails on missing steps)
+        run: npx bddgen
+
+      - name: List tests (verifies config, projects and test discovery)
+        run: npx playwright test --list
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
+          # Placeholders: listing tests needs valid config but never logs in.
+          SUITECRM_USERNAME: build-check
+          SUITECRM_PASSWORD: build-check
+
+  ui-tests:
+    name: UI tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
+      SUITECRM_USERNAME: ${{ secrets.SUITECRM_USERNAME }}
+      SUITECRM_PASSWORD: ${{ secrets.SUITECRM_PASSWORD }}
+      RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Check secrets are configured
+        run: |
+          if [ -z "$SUITECRM_USERNAME" ] || [ -z "$SUITECRM_PASSWORD" ]; then
+            echo "::error::Repository secrets SUITECRM_USERNAME and SUITECRM_PASSWORD must be set (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - name: Run all UI tests (Chromium, Firefox, WebKit)
+        run: npm test
+
+      - name: Show pass/fail counts
+        if: always()
+        run: node scripts/test-summary.mts
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload failure evidence (screenshots, videos, traces)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
