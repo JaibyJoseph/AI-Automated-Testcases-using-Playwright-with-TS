@@ -22,6 +22,12 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Build never logs in, but bddgen and --list load playwright.config.ts, which validates
+    # these variables at startup. Placeholders keep real secrets out of the build stage.
+    env:
+      BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
+      SUITECRM_USERNAME: build-check
+      SUITECRM_PASSWORD: build-check
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,11 +66,6 @@ jobs:
 
       - name: List tests (verifies config, projects and test discovery)
         run: npx playwright test --list
-        env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
-          # Placeholders: listing tests needs valid config but never logs in.
-          SUITECRM_USERNAME: build-check
-          SUITECRM_PASSWORD: build-check
 
   ui-tests:
     name: UI tests
