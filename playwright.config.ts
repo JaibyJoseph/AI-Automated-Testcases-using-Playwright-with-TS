@@ -1,15 +1,45 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices, type Project } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
 import { env } from './src/config/env';
+import { AUTH_STATE_FILE } from './src/config/paths';
 
 const isCI = !!process.env.CI;
+
+// One ID per run, used in test-data names. Workers inherit it because the config sets it
+// in the main process before workers start; later re-evaluations in workers keep the value.
+process.env.RUN_ID ??= new Date().toISOString().replace(/[-:]/g, '').slice(0, 13);
 
 // bddgen turns each .feature file into a Playwright spec in .features-gen/ (gitignored).
 const testDir = defineBddConfig({
   features: 'features/**/*.feature',
   steps: ['src/steps/**/*.ts', 'src/fixtures/**/*.ts'],
   missingSteps: 'fail-on-gen',
+  examplesTitleFormat: 'Example #<_index_>: <company> (<type>, <industry>)',
 });
+
+const browsers = [
+  { name: 'chromium', device: devices['Desktop Chrome'] },
+  { name: 'firefox', device: devices['Desktop Firefox'] },
+  { name: 'webkit', device: devices['Desktop Safari'] },
+];
+
+// Per browser, two projects:
+// - "<browser>": reuses the saved session; everything except @auth.
+// - "<browser>-auth": @auth scenarios that type credentials themselves. They start logged out
+//   and run with tracing off so the password never lands in a trace file.
+const browserProjects: Project[] = browsers.flatMap(({ name, device }) => [
+  {
+    name,
+    grepInvert: /@auth/,
+    dependencies: ['setup'],
+    use: { ...device, storageState: AUTH_STATE_FILE },
+  },
+  {
+    name: `${name}-auth`,
+    grep: /@auth/,
+    use: { ...device, trace: 'off' },
+  },
+]);
 
 export default defineConfig({
   testDir,
@@ -21,9 +51,12 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   // The target is a shared public demo, so keep load low.
   workers: isCI ? 1 : 2,
-  timeout: 30_000,
+  // Includes fixture teardown, i.e. deleting the records a scenario created.
+  timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: [
+    // First, so artifacts are scrubbed before other reporters copy them.
+    ['./src/support/redactionReporter.ts'],
     ['list'],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
     ['json', { outputFile: 'reports/results.json' }],
@@ -39,8 +72,11 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'setup',
+      testDir: './tests/setup',
+      testMatch: /.*\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'], trace: 'off', video: 'off', screenshot: 'off' },
     },
+    ...browserProjects,
   ],
 });
