@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "node_modules/@playwright/mcp/cli.js",
+        "--browser",
+        "chrome",
+        "--isolated",
+        "--storage-state",
+        ".auth/user.json",
+        "--allowed-origins",
+        "https://demo.suiteondemand.com",
+        "--output-dir",
+        ".playwright-mcp",
+        "--viewport-size",
+        "1280x800"
+      ]
+    }
+  }
+}

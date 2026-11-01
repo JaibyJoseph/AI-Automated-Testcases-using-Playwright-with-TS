@@ -53,8 +53,13 @@ Output: `reports/html` (HTML report), `reports/results.json`, `reports/junit.xml
 
 Every record a scenario creates is named `PWAUTO-<RUN_ID>-<random> <label>` and deleted after the scenario, also when it fails. If cleanup itself fails, the report shows a `cleanup-failed` annotation with the record id.
 
+## Exploring the app with Playwright MCP
+
+Claude Code can drive a browser through the project's Playwright MCP server to explore screens and find locators. Run `npm run session:refresh` first, then restart Claude Code and approve the `playwright` server. Setup, safety flags and rules: [docs/exploration.md](docs/exploration.md).
+
 ## Known limitations
 
 - The demo is shared and resets periodically; other users can change data at any time.
 - `.auth/user.json` holds a live session cookie. It is gitignored; do not share it.
 - Secrets are scrubbed from text artifacts and never typed in traced projects (see [ADR 0005](docs/decisions/0005-sessions-test-data-and-secret-hygiene.md)). The demo account's username equals its password, so that string still appears in the username `Fill` step.
+- `npm audit` reports 12 moderate findings, all from one advisory ([GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), `minimatch` < 11.0.1, published 2026-10-30) in the ESLint toolchain. ESLint 10 and typescript-eslint still require `minimatch` 10, so no compatible fix exists yet. Dev-time only; exploitable only with attacker-controlled glob patterns. Revisit when ESLint updates.
