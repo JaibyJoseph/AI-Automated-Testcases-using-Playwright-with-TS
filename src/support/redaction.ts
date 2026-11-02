@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // Environment variables whose values must never appear in artifacts, logs or (later) AI prompts.
-export const SECRET_ENV_VARS = ['SUITECRM_PASSWORD'] as const;
+export const SECRET_ENV_VARS = ['SUITECRM_PASSWORD', 'API_USER_PASSWORD'] as const;
 
 export const REDACTED = '[REDACTED]';
 

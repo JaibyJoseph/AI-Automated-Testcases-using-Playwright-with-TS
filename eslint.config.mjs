@@ -24,6 +24,8 @@ export default defineConfig(
       // Fixed sleeps and forced clicks hide real synchronisation problems.
       'playwright/no-wait-for-timeout': 'error',
       'playwright/no-force-option': 'error',
+      // expectStatus() (src/api/assertions.ts) wraps expect() for API responses.
+      'playwright/expect-expect': ['warn', { assertFunctionNames: ['expectStatus'] }],
     },
   },
   {

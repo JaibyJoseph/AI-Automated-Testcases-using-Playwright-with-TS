@@ -11,7 +11,7 @@
         "--storage-state",
         ".auth/user.json",
         "--allowed-origins",
-        "https://demo.suiteondemand.com",
+        "https://demo.suiteondemand.com;https://betappabharath-api-testlab.bharathbetappa.workers.dev",
         "--output-dir",
         ".playwright-mcp",
         "--viewport-size",

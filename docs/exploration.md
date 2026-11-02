@@ -15,7 +15,7 @@ Server flags:
 
 - `--browser chrome --isolated`: installed Chrome with a throwaway in-memory profile, never your personal profile.
 - `--storage-state .auth/user.json`: reuses the session saved by the `setup` project, so credentials are never typed in an MCP session.
-- `--allowed-origins https://demo.suiteondemand.com`: other origins are blocked (verified: `example.com` returns `ERR_BLOCKED_BY_CLIENT`). Playwright documents this as a guard rail, not a security boundary.
+- `--allowed-origins`: only the two applications under test, `https://demo.suiteondemand.com` (UI) and `https://betappabharath-api-testlab.bharathbetappa.workers.dev` (banking practice API with Swagger UI). Other origins are blocked (verified: `example.com` returns `ERR_BLOCKED_BY_CLIENT`). Playwright documents this as a guard rail, not a security boundary. Changing the list requires restarting Claude Code.
 - `--output-dir .playwright-mcp`, `--viewport-size 1280x800`.
 
 Permissions:

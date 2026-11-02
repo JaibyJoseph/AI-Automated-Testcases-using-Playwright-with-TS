@@ -14,7 +14,7 @@ const testDir = defineBddConfig({
   features: 'features/**/*.feature',
   steps: ['src/steps/**/*.ts', 'src/fixtures/**/*.ts'],
   missingSteps: 'fail-on-gen',
-  examplesTitleFormat: 'Example #<_index_>: <company> (<type>, <industry>)',
+  // Example titles are set per Examples table with a "# title-format:" comment in the feature file.
 });
 
 const browsers = [
@@ -24,19 +24,21 @@ const browsers = [
 ];
 
 // Per browser, two projects:
-// - "<browser>": reuses the saved session; everything except @auth.
+// - "<browser>": reuses the saved session; everything except @auth and @api.
 // - "<browser>-auth": @auth scenarios that type credentials themselves. They start logged out
 //   and run with tracing off so the password never lands in a trace file.
+// @api scenarios run once, in the browserless "api" project below.
 const browserProjects: Project[] = browsers.flatMap(({ name, device }) => [
   {
     name,
-    grepInvert: /@auth/,
+    grepInvert: [/@auth/, /@api/],
     dependencies: ['setup'],
     use: { ...device, storageState: AUTH_STATE_FILE },
   },
   {
     name: `${name}-auth`,
     grep: /@auth/,
+    grepInvert: /@api/,
     use: { ...device, trace: 'off' },
   },
 ]);
@@ -78,5 +80,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], trace: 'off', video: 'off', screenshot: 'off' },
     },
     ...browserProjects,
+    {
+      // @api features (features/api). API steps never request `page`, so no browser starts.
+      // Tracing off because traces record the token request body (password) and Authorization
+      // headers; failures carry the response body in the assertion message instead.
+      name: 'api',
+      grep: /@api/,
+      use: { trace: 'off', video: 'off', screenshot: 'off' },
+    },
   ],
 });

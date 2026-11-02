@@ -1,4 +1,7 @@
 import { createBdd, test as base } from 'playwright-bdd';
+import { ApiScenarioContext } from '../api/ApiScenarioContext';
+import type { BankingApiClient } from '../api/BankingApiClient';
+import { anonymousApiFixture, apiFixture, createdApiCustomersFixture, newAuthenticatedApiFixture } from './api';
 import { AccountDetailPage } from '../pages/AccountDetailPage';
 import { AccountEditPage } from '../pages/AccountEditPage';
 import { HomePage } from '../pages/HomePage';
@@ -27,7 +30,7 @@ type Fixtures = {
 };
 
 // Each scenario gets its own browser context and fresh fixtures, so scenarios never share state.
-export const test = base.extend<Fixtures>({
+const uiTest = base.extend<Fixtures>({
   loginPage: async ({ page }, use) => {
     await use(new LoginPage(page));
   },
@@ -60,6 +63,25 @@ export const test = base.extend<Fixtures>({
       }
     }
   },
+});
+
+type ApiFixtures = {
+  newAuthenticatedApi: () => Promise<BankingApiClient>;
+  anonymousApi: BankingApiClient;
+  api: BankingApiClient;
+  apiScenario: ApiScenarioContext;
+  createdApiCustomers: Set<string>;
+};
+
+// API fixtures (no browser): see ./api.ts. A scenario only starts a browser if a step asks for `page`.
+export const test = uiTest.extend<ApiFixtures>({
+  newAuthenticatedApi: newAuthenticatedApiFixture,
+  anonymousApi: anonymousApiFixture,
+  api: apiFixture,
+  apiScenario: async ({}, use) => {
+    await use(new ApiScenarioContext());
+  },
+  createdApiCustomers: createdApiCustomersFixture,
 });
 
 export const { Given, When, Then } = createBdd(test);

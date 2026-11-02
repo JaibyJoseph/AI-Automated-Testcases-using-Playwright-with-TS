@@ -1,12 +1,12 @@
 // Prints pass/fail counts from Playwright's JSON report (reports/results.json).
 // In GitHub Actions it also writes a Markdown table to the job summary page.
-// Run with: node scripts/test-summary.mts  (Node 24 runs TypeScript directly)
+// Run with: node scripts/test-summary.mts [report path] [title]  (Node 24 runs TypeScript directly)
 import fs from 'node:fs';
 import { stripVTControlCharacters } from 'node:util';
 
 type TestStatus = 'expected' | 'unexpected' | 'flaky' | 'skipped';
 type JsonResult = { status: string; retry: number; errors: { message?: string }[] };
-type JsonTest = { projectName: string; status: TestStatus; results: JsonResult[] };
+type JsonTest = { projectName: string; status: TestStatus; expectedStatus: string; results: JsonResult[] };
 type JsonSpec = { title: string; file: string; tests: JsonTest[] };
 type JsonSuite = { title: string; specs?: JsonSpec[]; suites?: JsonSuite[] };
 type JsonReport = { suites: JsonSuite[]; errors: { message?: string }[]; stats: { duration: number } };
@@ -15,6 +15,7 @@ type Row = { project: string; passed: number; failed: number; flaky: number; ski
 type Failure = { project: string; title: string; error: string };
 
 const reportPath = process.argv[2] ?? 'reports/results.json';
+const title = process.argv[3] ?? 'Tests';
 if (!fs.existsSync(reportPath)) {
   console.error(`No report at ${reportPath}. Did the test run start?`);
   process.exit(1);
@@ -23,6 +24,8 @@ const report = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as JsonReport;
 
 const rows = new Map<string, Row>();
 const failures: Failure[] = [];
+// Tests marked as expected failures (@fail / test.fail) that did fail: counted as passed, listed as known defects.
+const knownDefects: Failure[] = [];
 
 // Playwright error messages contain terminal colour codes; strip them for readable output.
 const firstLine = (text = '') =>
@@ -47,14 +50,13 @@ function visit(suite: JsonSuite, path: string[]): void {
       else row.skipped++;
       rows.set(test.projectName, row);
 
-      if (test.status === 'unexpected') {
-        const last = test.results.at(-1);
-        failures.push({
-          project: test.projectName,
-          title: [...path, spec.title].filter(Boolean).join(' › '),
-          error: firstLine(last?.errors[0]?.message),
-        });
-      }
+      const entry = () => ({
+        project: test.projectName,
+        title: [...path, spec.title].filter(Boolean).join(' › '),
+        error: firstLine(test.results.at(-1)?.errors[0]?.message),
+      });
+      if (test.status === 'unexpected') failures.push(entry());
+      else if (test.status === 'expected' && test.expectedStatus === 'failed') knownDefects.push(entry());
     }
   }
   // File-level suites are named after the generated spec path; keep only feature/describe titles.
@@ -77,7 +79,7 @@ const minutes = (report.stats.duration / 60_000).toFixed(1);
 const outcome = total.failed > 0 || report.errors.length > 0 ? 'FAILED' : 'PASSED';
 
 // Plain-text version for the job log.
-console.log(`\nUI tests ${outcome}: ${String(count)} tests in ${minutes} min`);
+console.log(`\n${title} ${outcome}: ${String(count)} tests in ${minutes} min`);
 console.log(
   `  passed ${String(total.passed)} | failed ${String(total.failed)} | flaky ${String(total.flaky)} | skipped ${String(total.skipped)}\n`,
 );
@@ -87,13 +89,14 @@ for (const r of all) {
   );
 }
 for (const f of failures) console.log(`\n  FAILED [${f.project}] ${f.title}\n    ${f.error}`);
+for (const k of knownDefects) console.log(`\n  KNOWN DEFECT (expected failure) [${k.project}] ${k.title}`);
 for (const e of report.errors) console.log(`\n  RUN ERROR: ${firstLine(e.message)}`);
 
 // Markdown version for the GitHub Actions job summary.
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
 if (summaryFile) {
   const md = [
-    `## UI tests ${outcome === 'PASSED' ? 'passed' : 'failed'}`,
+    `## ${title} ${outcome === 'PASSED' ? 'passed' : 'failed'}`,
     '',
     `**${String(count)} tests** in ${minutes} min`,
     '',
@@ -107,10 +110,18 @@ if (summaryFile) {
     ...(failures.length > 0
       ? ['### Failed tests', '', ...failures.map((f) => `- \`${f.project}\` ${f.title}: ${f.error}`), '']
       : []),
+    ...(knownDefects.length > 0
+      ? [
+          '### Known defects (expected failures, counted as passed)',
+          '',
+          ...knownDefects.map((k) => `- \`${k.project}\` ${k.title}`),
+          '',
+        ]
+      : []),
     ...(report.errors.length > 0
       ? ['### Run errors', '', ...report.errors.map((e) => `- ${firstLine(e.message)}`), '']
       : []),
-    'Flaky = failed first, passed on retry. Full details are in the `playwright-report` artifact.',
+    'Flaky = failed first, passed on retry. Full details are in the `playwright-report-*` artifacts.',
     '',
   ].join('\n');
   fs.appendFileSync(summaryFile, md);

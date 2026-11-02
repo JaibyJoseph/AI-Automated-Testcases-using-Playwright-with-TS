@@ -38,7 +38,9 @@ Tags: `@smoke` (fast critical path), `@regression`, `@critical`, `@negative`, pl
 
 | Command                               | What it does                                                    |
 | ------------------------------------- | --------------------------------------------------------------- |
-| `npm test`                            | Generate specs and run all scenarios in all browsers            |
+| `npm test`                            | Generate specs and run all UI and API scenarios                 |
+| `npm run test:ui`                     | UI scenarios only (setup + Chromium, Firefox, WebKit projects)  |
+| `npm run test:api`                    | API scenarios only (`api` project, no browser)                  |
 | `npm run test:smoke`                  | Run scenarios tagged `@smoke`                                   |
 | `npm run test:regression`             | Run scenarios tagged `@regression`                              |
 | `npm run test:headed`                 | Run with a visible browser                                      |
@@ -52,6 +54,18 @@ Output: `reports/html` (HTML report), `reports/results.json`, `reports/junit.xml
 ## Test data on the shared demo
 
 Every record a scenario creates is named `PWAUTO-<RUN_ID>-<random> <label>` and deleted after the scenario, also when it fails. If cleanup itself fails, the report shows a `cleanup-failed` annotation with the record id.
+
+## API tests
+
+API behaviour of the [banking practice API](https://betappabharath-api-testlab.bharathbetappa.workers.dev/swagger) is described in Gherkin under `features/api/` (tagged `@api`) and runs in the browserless `api` project, so it is part of `npm test`. Run only the API features with `npm test -- --project=api`.
+
+- Steps: `src/steps/api/`. "When" steps call the API and record the response in `apiScenario`; "Then" steps assert on it (e.g. `the response status should be 201`, which prints the response body on failure).
+- `src/api/BankingApiClient.ts`: one method per endpoint, no assertions. API fixtures (`api`, `anonymousApi`, `newAuthenticatedApi`, `createdApiCustomers`) live in `src/fixtures/api.ts` and are registered with the UI fixtures in `src/fixtures/index.ts`.
+- Each scenario gets its own access token. The API keeps data per token, so scenarios are isolated from each other.
+- Created customers are removed after each scenario. The API refuses to delete accounts with a balance or customers with accounts (409), so cleanup withdraws, deletes accounts, then deletes the customer.
+- Known defect: `POST /auth/token` returns 201 for a wrong password. That scenario is tagged `@known-defect @fail` (expected failure); it will report "expected to fail but passed" once the API is fixed.
+- Tracing is off for the `api` project because traces would record the token request body and Authorization headers.
+- VS Code: `.vscode/settings.json` points the Cucumber extension at `src/steps/`, so it can resolve steps.
 
 ## Exploring the app with Playwright MCP
 

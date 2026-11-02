@@ -9,6 +9,11 @@ const EnvSchema = z.object({
   BASE_URL: z.url({ message: 'BASE_URL must be a full URL, e.g. https://demo.suiteondemand.com' }),
   SUITECRM_USERNAME: z.string({ message: 'SUITECRM_USERNAME is required' }).min(1, 'SUITECRM_USERNAME is required'),
   SUITECRM_PASSWORD: z.string({ message: 'SUITECRM_PASSWORD is required' }).min(1, 'SUITECRM_PASSWORD is required'),
+  API_BASE_URL: z.url({
+    message: 'API_BASE_URL must be a full URL, e.g. https://betappabharath-api-testlab.bharathbetappa.workers.dev',
+  }),
+  API_USER_EMAIL: z.email({ message: 'API_USER_EMAIL must be an email address' }),
+  API_USER_PASSWORD: z.string({ message: 'API_USER_PASSWORD is required' }).min(1, 'API_USER_PASSWORD is required'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

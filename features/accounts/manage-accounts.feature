@@ -18,6 +18,7 @@ Feature: Account management
     Then the account detail page should show the account name
     And the account should have type "<type>" and industry "<industry>"
 
+    # title-format: Example #<_index_>: <company> (<type>, <industry>)
     Examples:
       | company          | type     | industry   |
       | Northwind Bank   | Customer | Banking    |

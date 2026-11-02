@@ -28,6 +28,9 @@ jobs:
       BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
       SUITECRM_USERNAME: build-check
       SUITECRM_PASSWORD: build-check
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://betappabharath-api-testlab.bharathbetappa.workers.dev' }}
+      API_USER_EMAIL: build-check@example.test
+      API_USER_PASSWORD: build-check
     steps:
       - name: Check out code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,6 +70,9 @@ jobs:
       - name: List tests (verifies config, projects and test discovery)
         run: npx playwright test --list
 
+  # UI and API tests both need only a green build, so they run in parallel.
+  # Each job receives only its own secrets; the other app's variables get placeholders because
+  # playwright.config.ts validates every variable at startup.
   ui-tests:
     name: UI tests
     needs: build
@@ -76,6 +82,9 @@ jobs:
       BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
       SUITECRM_USERNAME: ${{ secrets.SUITECRM_USERNAME }}
       SUITECRM_PASSWORD: ${{ secrets.SUITECRM_PASSWORD }}
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://betappabharath-api-testlab.bharathbetappa.workers.dev' }}
+      API_USER_EMAIL: not-used@example.test
+      API_USER_PASSWORD: not-used
       RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out code
@@ -101,17 +110,17 @@ jobs:
           fi
 
       - name: Run all UI tests (Chromium, Firefox, WebKit)
-        run: npm test
+        run: npm run test:ui
 
       - name: Show pass/fail counts
         if: always()
-        run: node scripts/test-summary.mts
+        run: node scripts/test-summary.mts reports/results.json "UI tests"
 
       - name: Upload HTML report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
+          name: playwright-report-ui
           path: reports/
           retention-days: 14
           if-no-files-found: ignore
@@ -120,7 +129,58 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-results
+          name: test-results-ui
           path: test-results/
           retention-days: 7
+          if-no-files-found: ignore
+
+  api-tests:
+    name: API tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: ${{ vars.BASE_URL || 'https://demo.suiteondemand.com' }}
+      SUITECRM_USERNAME: not-used
+      SUITECRM_PASSWORD: not-used
+      API_BASE_URL: ${{ vars.API_BASE_URL || 'https://betappabharath-api-testlab.bharathbetappa.workers.dev' }}
+      API_USER_EMAIL: ${{ secrets.API_USER_EMAIL }}
+      API_USER_PASSWORD: ${{ secrets.API_USER_PASSWORD }}
+      RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # No browser install: API scenarios use Playwright's HTTP client only.
+
+      - name: Check secrets are configured
+        run: |
+          if [ -z "$API_USER_EMAIL" ] || [ -z "$API_USER_PASSWORD" ]; then
+            echo "::error::Repository secrets API_USER_EMAIL and API_USER_PASSWORD must be set (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - name: Run all API tests
+        run: npm run test:api
+
+      - name: Show pass/fail counts
+        if: always()
+        run: node scripts/test-summary.mts reports/results.json "API tests"
+
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-api
+          path: reports/
+          retention-days: 14
           if-no-files-found: ignore

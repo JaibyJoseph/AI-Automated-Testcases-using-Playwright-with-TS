@@ -11,6 +11,8 @@
   "scripts": {
     "bddgen": "bddgen",
     "test": "bddgen && playwright test",
+    "test:ui": "bddgen && playwright test --project=setup --project=chromium --project=chromium-auth --project=firefox --project=firefox-auth --project=webkit --project=webkit-auth",
+    "test:api": "bddgen && playwright test --project=api",
     "test:smoke": "bddgen && playwright test --grep @smoke",
     "test:regression": "bddgen && playwright test --grep @regression",
     "test:headed": "bddgen && playwright test --headed",
